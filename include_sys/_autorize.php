@@ -56,11 +56,21 @@ $uopt_a=array(
 	'ttmailnew'=>array('1','1 0'), // TeddyId: уведомлять о новом личном сообщении
 	'ttcom'=>array('0','1 0'), // TeddyId: уведомлять о любых ответах на ваш комментарий
 	'ttcom1'=>array('0','1 0') // TeddyId: уведомлять об ответе автора блога на ваш комментарий
-
 ); foreach($uopt_a as $n=>$l) if(isset(${'uopt_'.$n})) $uopt_a[$n][0]=${'uopt_'.$n};
 
-if(empty($MYHOST)) list(,$MYHOST)=explode('://',$httpsite,2);
-if($_SERVER["HTTP_HOST"]==$MYHOST) $acc=$acc2=''; else { list($acc,$acc2,)=explode('.',$_SERVER["HTTP_HOST"],3); }
+
+// domain
+if(isset($rootdomain)) {
+    $dlen=strlen($rootdomain);
+    if($rootdomain==$_SERVER['HTTP_HOST']) { $acn=0; $acc=''; $MYHOST=$rootdomain; } // главный домен
+    elseif('.'.$rootdomain == substr($_SERVER['HTTP_HOST'],-$dlen-1)) { $acc=substr($_SERVER['HTTP_HOST'],0,-$dlen-1); $MYHOST=$rootdomain; } // поддомен главного домена
+    else { $MYHOST=$acc=$_SERVER['HTTP_HOST']; }
+} else { // старый формат, если в config.sys не прописан $rootdomain
+
+    if(empty($MYHOST)) list(,$MYHOST)=explode('://',$httpsite,2);
+    if($_SERVER["HTTP_HOST"]==$MYHOST) $acc=$acc2=''; else { list($acc,$acc2,)=explode('.',$_SERVER["HTTP_HOST"],3); }
+
+}
 
 $dopa=trim(str_replace('/','_',$blogdir),"/_ ");
 
@@ -293,8 +303,12 @@ function remake_unic($unic) {
     || getis_global($unic)===false) {
 	    $msqt=msq_table($GLOBALS['db_unic']);
 	    $emtu=empty($GLOBALS['admin_unics']);
+
+	    if($GLOBALS['admin'] && !$msqt) return $GLOBALS['msqe']='';
+
 	    idie("<h2>Fatal Error</h2>"
 		."<p>UNIC = ".$unic
+		."<p>ADMIN = ".$GLOBALS['admin']
 		."<p>config.sys <b>\$db_unic=\"".$GLOBALS['db_unic']."\";</b>"
 		."<br>MySQL ".$GLOBALS['db_unic'].": ".($msqt?"<font color=green>OK</font>":"<font color=red>NOT EXIST</font>")
 		."<br>config.sys \$admin_unics ".($emtu?"<font color=magenta>empty</font>":"<font color=green>SET</font>")
@@ -539,7 +553,7 @@ function redirect($path='/',$code=301) {
 	die("<noscript><meta http-equiv=refresh content=\"0;url=\"".$path."\"></noscript><script>location.replace(\"".$path."\")</script>");
 }
 
-function echmod($a,$b) { if(!isset($GLOBALS['disable_chmod'])) @chmod($a,$b); }
+function echmod($a,$b) { if(!isset($GLOBALS['disable_chmod'])) chmod($a,$b); }
 
 function logi($f,$s,$a="a+") { $n=$GLOBALS["host_log"].$f; $l=fopen($n,$a); fputs($l,$s); fclose($l); echmod($n,0666); }
 function ifdebug($a){ if(isset($GLOBALS['debug'])) logi('debug.log',"\n\n================== ".date("Y-m-d h:i:s")." ---> ".print_r($a,1)."\n\n"); }
@@ -790,23 +804,27 @@ function accd() { $acc=verf_acc(); return ($acc==''?'':"userdata/".$acc."/"); }
 
 function verf() { global $acn,$acc,$unic,$mnogouser,$ADM,$admin;
     if($mnogouser!=1) { $acc=''; $acn=0; return $ADM=$admin; }
-    $a=false;
-    if(isset($acn)) $a=$acn; else $a=RE0('acn'); if($a!=false) {
-	$l=ms("SELECT `acc` FROM `jur` WHERE `acn`='".e($a)."' AND `unic`='".e($unic)."'","_l");
-	if($l!=false) { $acc=$l; $acn=$a; return $ADM=1; }
+
+    if( isset($acn) || false !== ($acn=RE0('acn')) ) { // авторизация по acn - номеру блога
+	if($acn===0) { $acc=''; return $ADM=$admin; } // для root
+	$l=ms("SELECT `acc` FROM `jur` WHERE `acn`='".e($acn)."' AND `unic`='".e($unic)."'","_l");
+	if($l!=false) { $acc=$l; return $ADM=1; }
 	$acc=''; return $ADM=$acn=$admin=0; // ты нас обманывал, сука
     }
-    if(isset($acc)) $a=$acc; else $a=RE0('acc'); if($a!=false) {
-	$l=ms("SELECT `acn` FROM `jur` WHERE `acc`='".e($a)."' AND `unic`='".e($unic)."'","_l");
-	if($l!=false) { $acc=$a; $acn=$l; return $ADM=1; }
+
+    if( isset($acc) || false !== ($acc=RE0('acc')) ) { // авторизация по acc - имени поддомена
+	if($acc===0) { $acn=0; return $ADM=$admin; } // для root
+	$l=ms("SELECT `acn` FROM `jur` WHERE `acc`='".e($acc)."' AND `unic`='".e($unic)."'","_l");
+	if($l!=false) { $acn=$l; return $ADM=1; }
 	$acc=''; return $ADM=$acn=$admin=0; // ты нас обманывал, сука
     }
+
     $acc=''; return $ADM=$acn=0;
 }
 
 function verf_acn() { if(!isset($GLOBALS['acn'])) verf(); return $GLOBALS['acn']; }
 function verf_acc() { if(!isset($GLOBALS['acc'])) verf(); return $GLOBALS['acc']; }
-function ADMA($i=0) { if(!isset($GLOBALS['ADM'])) verf(); if(!$GLOBALS['ADM']&&!$i) idie('You are not admin!'); return $GLOBALS['ADM']; } // проверка на админа акаунта
+function ADMA($i=0) { if(!isset($GLOBALS['ADM'])) verf(); if(!$GLOBALS['ADM']&&!$i) шdie("You are not admin!"); return $GLOBALS['ADM']; } // проверка на админа акаунта
 
 function allowfile($file,$w=1) { global $acc,$filehost;
     $accd=accd();
@@ -987,11 +1005,11 @@ else ifhelpc(url,'xdomain','xdomain');";
 
 //-------- reset unic ---------
 
-function gettags($num=false) { global $article,$msqe;
+function gettags($num=false) { global $article;
     if(!@isset($article['tag'])) {
 	if($num==false && @isset($article['num'])) $num=$article['num'];
-	    $t=ms("SELECT `tag` FROM `dnevnik_tags` WHERE `num`='".e($num)."'".ANDC()." ORDER BY `tag`",'_a',0);
-	$r=array(); if($t) foreach($t as $l) $r[]=$l['tag'];
+	$t=ms("SELECT `tag` FROM `dnevnik_tags` WHERE `num`='".e($num)."'".ANDC()." ORDER BY `tag`",'_a',0);
+	$r=array(); foreach($t as $l) $r[]=$l['tag'];
 	if(!isset($article)) $article=array();
 	$article['tag']=$r;
     } return $article['tag'];
@@ -1018,12 +1036,10 @@ function teddyid_opovest($id,$text) {
     return intval($a['request_id']);
 }
 
-function mailbox_send($from=0,$to=4,$text='error') { global $db_mailbox,$msqe;
+function mailbox_send($from=0,$to=4,$text='error') { global $db_mailbox;
     $a=arae(array('unicto'=>$to,'unicfrom'=>$from,'text'=>$text));
-    $msq0=$msqe;
     if(!ms("SELECT COUNT(*) FROM ".$db_mailbox." WHERE `unicfrom`='".$a['unicfrom']."' AND `unicto`='".$a['unicto']."' AND `text`='".$a['text']."'","_l",0))
 	msq_add($db_mailbox,$a);
-    $msqe=$msq0;
 }
 
 

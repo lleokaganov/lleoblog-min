@@ -242,9 +242,39 @@ function parse_mytables($ta='') { $o=''; // $i="<i class='e_";
 				|| preg_replace("/ not null/s","",$arrpolel)==$strl
 				|| preg_replace("/ default '[^']+'/s"," not null",$strl)==$arrpolel
 				|| (preg_match("/^`.+` text$/s",$strl) && preg_match("/^`.+` varchar\(\d+\)/s",$arrpolel))
-				|| str_replace(" not null default 'current_timestamp'",'',$arrpolel)==$strl
+				|| str_ireplace(explode("\n","
+ default null
+ collate
+ utf8_bin
+ utf8_unicode_ci
+ utf8
+ 'current_timestamp'
+ character set
+ ascii_bin
+ ascii
+ armscii8_bin
+ armscii8
+"),'',$arrpolel)==$strl
 			    ) $arr_ok[$pole]=$str2; // равно
 			    else {  // изменить
+/*
+$ga=str_ireplace(explode("\n","
+ default null
+ collate
+ utf8_bin
+ utf8_unicode_ci
+ utf8
+ 'current_timestamp'
+ character set
+ ascii_bin
+ ascii
+ armscii8_bin
+ armscii8
+"),'',$arrpolel);
+
+idie("<p>".$ga."<br>".$arrpolel."<p>".$strl);
+*/
+
 				$ept=substr($arrpolel,strlen($pole)+3);
 				if($ept!=strtolower($str2)) $arr_change[$pole]=array($str2,$ept); else $arr_change[$pole]=array('ERROR: ['.$str2.']','['.$ept.']');
 			    }

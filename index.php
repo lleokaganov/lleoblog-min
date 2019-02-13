@@ -8,45 +8,45 @@ $d=$_SERVER["REQUEST_URI"]; if(($i=strpos($d,'?'))!==false) $d=substr($d,0,$i); 
 }
 */
 
+// die('REMONT');
+
 include "config.php";
 $_SCRIPT=array(0=>"var page_onstart=[];");
 $_SCRIPT_ADD=$_STYLE=$_HEADD=array();
 include $include_sys."_autorize.php";
 include $include_sys."_modules.php";
-
-// заплатки для инсталла:
-// if(!function_exists('acc_link')){function acc_link($s){};}
+// include_once $include_sys."blogpage.php"; // потом удалить!!!
 
 if(isset($HTTPS_REDIRECT) && 'http'==$HTTPS) redirect($httpsite.$_SERVER["REQUEST_URI"]);
 
-## if($acc!='') {
-if($acc!='' AND (empty($realdom) OR $realdom!=$acc) ) {
-  if(!empty($xdomain)&&$xdomain==$acc) die('E-XDM: '.$GLOBALS['MYPAGE']); // а нехуй на xdomain ломиться
-  if($acc=='www') {
-     if(isset($redirect_www)) redirect((substr($_SERVER["HTTP_HOST"],4)==$MYHOST?$httpsite:str_replace('//','//'.$acc2.'.',$httpsite)).$_SERVER["REQUEST_URI"]);
-     else $acc=$acc2;
+// <------>$httpsite = $HTTPS."://".$rootdomain; // $httpsite = $HTTPS."://".$_SERVER['HTTP_HOST'];
+
+if(!empty($acc)) {
+
+  if(!empty($xdomain)&&$xdomain==$acc) die('E-XDM: '.$GLOBALS['MYPAGE']); // нехуй на xdomain ломиться
+  if(substr($acc,0,4)=='www.') { $acc=substr($acc,4); if(isset($redirect_www)) redirect($HTTPS."://".($acc==''?'':$acc.'.').$MYHOST.$_SERVER["REQUEST_URI"]);  } // www.
+  if(!$mnogouser) idie("Error 404#: Subdomain <b>".h($acc)."</b> not exist on http[s]://".$MYHOST,"HTTP/1.1 404 Not Found"); // однопользовательский блог не понимает доменов
+  if(false==strpos($acc,'.')) { // поддомен пользователя
+	if(false==($p=ms("SELECT `acn`,`unic` FROM `jur` WHERE `acc`='".e($acc)."'","_1"))) { $acn=-1; $ADM=0; }
+	else { $acn=$p['acn']; $ADM=($unic==$p['unic']?1:0); if($ADM) $ttl=0; }
+  } else { // заход как бы с внешнего домена, но в поддомен пользователя
+	if(false==($p=ms("SELECT `acn`,`acc`,`unic` FROM `jur` WHERE `domain`='".e($acc)."'","_1"))) { $acn=-1; $ADM=0; }
+	else { $acn=$p['acn']; $acc=$p['acc']; $ADM=($unic==$p['unic']?1:0); if($ADM) $ttl=0; }
   }
-	if(!isset($mnogouser)||$mnogouser!==1) idie("Error 404#: Subdomain <b>".h($acc)."</b> not exist on http[s]://".$MYHOST,"HTTP/1.1 404 Not Found");
-        if(($p=ms("SELECT `acn`,`unic` FROM `jur` WHERE `acc`='".e($acc)."' ORDER BY (`unic`='".e($unic)."') DESC LIMIT 1","_1"))===false) { $acn=-1; $ADM=0; }
-        else { $acn=$p['acn']; $ADM=($unic==$p['unic']?1:0); if($ADM) $ttl=0; }
-} else {
 
+} else { $acc=''; $acn=0; $ADM=$admin; } // нет работы с поддоменами
 
-//if(!empty($realdom) AND $realdom==$acc) {
-//$httpsite = "http://".$realdom.".lleo.me";
-//$httphost = $httpsite.$wwwhost;
-//}
-
-
-
-$acc=''; $acn=0; $ADM=$admin;
-
-
-
-}
 //====================================
 
+// if($admin) die("<pre>".print_r($GLOBALS,1));
+// if($admin) idie('#<pre>'.print_r($_SERVER,1));
+
 mystart();
+
+//SCRIPTS("jog_kuki",$jog_scripts." function setIsReady() { c_rest('".$uc."'); c_rest('lju'); } ");
+//SCRIPTS("jog_kuki","function setIsReady() { c_rest('".$uc."'); c_rest('lju'); }");
+
+// SCRIPT_ADD($GLOBALS['www_design']."JsHttpRequest.js"); // подгрузить аякс
 
 function getbasaDate($Date) {
 	if(!isset($_GET['hash'])
@@ -65,7 +65,17 @@ function ARTICLE_Date($Date,$novis) { global $article,$acc;
 	$article=getbasaDate($Date);
         if($article!==false) ARTICLE();
     return false;
+/*
+	idie(mpers(get_sys_tmp("404_issue.htm"),array(
+		'before'=>issor('_GET|before',0),
+		'Date'=>h($Date),
+		'wwwhost'=>$GLOBALS['wwwhost'],
+		'Date_last'=>ms("SELECT `Date` FROM `dnevnik_zapisi` ".WHERE("`DateDatetime`!=0")." ORDER BY `DateDatetime` DESC LIMIT 1","_l"),
+		'hash'=>issor('_GET|hash',0)
+	)),"HTTP/1.1 404 Not Found");
+*/
 }
+
 
 function get_userfile($l) { global $acc,$filehost;
 	if($acc!='') {
@@ -95,6 +105,7 @@ function ARTICLE() { global $acc,$_PAGE,$article,$file_template,$wwwhost,$REF,$h
 
 if(empty($article['template'])) $article['template']='blog';
 
+
 if(false===($design=get_userfile("template/".$article['template'].'.html'))
 && false===($design=get_userfile("template/".$article['template'].'.htm'))
 ) {
@@ -123,6 +134,10 @@ $_PAGE['httphost']=$GLOBALS['httphost'];
 $_PAGE['wwwhost']=$wwwhost;
 $_PAGE['signature']=$GLOBALS['signature'];
 $_PAGE['wwwcharset']=h($GLOBALS['wwwcharset']);
+// $_PAGE['hashpage']=$GLOBALS['hashpage'];
+// $_PAGE['foto_www_preview']=$GLOBALS['foto_www_preview'];
+// $_PAGE['foto_res_small']=$GLOBALS['foto_res_small'];
+// $hashpage=rand(0,1000000); $hashpage=substr(broident($hashpage.$hashinput),0,6).'-'.$hashpage;
 
 $_PAGE['design']=modules($design);
 if($GLOBALS['ADM']||$GLOBALS['admin']) {
@@ -131,12 +146,17 @@ if($GLOBALS['ADM']||$GLOBALS['admin']) {
 mpers(str_replace(array("\n","\r","\t"),'',get_sys_tmp("adminpanel.htm")),
 array('num'=>$article['num'],
 'Date'=>h($article['Date'])
+// 'www_design'=>$www_design
 ))
+// get_userfile("template/adminpanel.htm")
 .'</body>',$_PAGE['design']);
 }
 
 exit;
 }
+
+
+
 
 list($path)=explode('?',$GLOBALS['MYPAGE']); $path=rtrim(rpath($path),'\/');
 $pwwwhost=str_replace('/','\/',$wwwhost);
@@ -160,6 +180,13 @@ $IP=='78.110.50.100')) {
  	redirect('http://natribu.org/?WWFuZGV4JSDy+yDt6PXz-yDt5SD36PLg5fj8IHJvYm90cy50eHQg6CDr5efl+Pwg6vPk4CDt5SDt4OTuLiDfIOTr-yDq7uPuIHJvYm90cy50eHQg7+jx4Os-JSDv8OXq8OD54Okg6O3k5erx6PDu4uDy-CDy6PLz6yDv5fDl4OTw5fHg9ujoIPLl7CDq7u3y5e3y7uwsIOru8u7w++kg7+4g7OXx8vMg7+Xw5eDk8OXx4Pbo6C4gx+Dl4eDrLCBZYW5kZXgsIPfl8fLt7uUg8evu4u4h');
  	}
 
+/*
+	if(isset($_GET['module'])) {
+		if(preg_match("/[^0-9a-z_\-\.\/]+/si",$mod_name)) idie("Error 404: wrong name \"<b>".h($mod_name)."</b>\"");
+		$mod_name=substr($path,strlen($wwwhost)); $mod_name=str_replace('..','.',$mod_name);
+		$article=array('template'=>'module','num'=>0,'Date'=>h($mod_name)); ARTICLE(); }
+*/
+
 	if(!empty($rootpage)) {
 		if(substr($rootpage,0,6)=='index.') { // index в базе дневника
 			$article=ms("SELECT * FROM `dnevnik_zapisi` ".WHERE("`Date`='".e($rootpage)."'")." LIMIT 1","_1");
@@ -173,7 +200,18 @@ $IP=='78.110.50.100')) {
 		redirect($httphost.$rootpage); // если в конфиге установлен адрес заметки по умолчанию
 	}
 
+//	$admin=0; $podzamok=1;
+
 	$last=ms("SELECT `Date` FROM `dnevnik_zapisi` ".WHERE("`DateDatetime`!=0")." ORDER BY `Date` DESC LIMIT 1","_l");
+
+/*
+if($admin) die('tony #4'."<p>
+<br>admin: `$admin`
+<br>podzamok: `$podzamok`
+<br>acn: `$acn`
+<br>ADM: `$ADM`
+<p>".h("SELECT `Date` FROM `dnevnik_zapisi` ".WHERE("`DateDatetime`!=0")." ORDER BY `Date` DESC LIMIT 1"));
+*/
 
 	if($last=='') {
 	if(/*!msq_table('site') and */!msq_table('dnevnik_zapisi')) redirect($httphost."install",302); // в админку, если по первому разу
@@ -199,11 +237,19 @@ $IP=='78.110.50.100')) {
 if(preg_match("/[^0-9a-z_\-\.\/]+/si",$mod_name)) idie("Error 404: wrong name \"<b>".h($mod_name)."</b>\"");
 $mod_name=substr($path,strlen($wwwhost)); $mod_name=rpath($mod_name);
 
+// сперва ищем в модулях-страницах (темплайтах, вызывающих модуль - это более новый прогрессивный формат)
+//if(file_exists($file_template.$mod_name.".htm")) { $article=array('template'=>$mod_name,'num'=>0,'Date'=>h($mod_name)); ARTICLE(); }
+
 // затем ищем в модулях
 $mod=$host_module.$mod_name.".php"; if(file_exists($mod)) { include($mod); exit; }
 
+// затем в базе site
+//$text=ms("SELECT `text` FROM `site` ".WHERE("`name`='".e($mod_name)."' AND `type`='page'"),"_l",$ttl);
+//if($text!='') { $name=$mod_name; include("site.php"); exit; }
+
 // затем в базе дневника
 if(false!==($article=getbasaDate($mod_name))) ARTICLE();
+
 
 $article=ms("SELECT * FROM `dnevnik_zapisi` ".WHERE("(`Date`='".e($mod_name)."'
 OR `Date`='".e($mod_name)."/index.htm'
@@ -234,7 +280,7 @@ if(($p=ms("SELECT `text` FROM `site` WHERE `name`='redirect'","_l",$ttl*10))!==f
 `2015/03/25.html`
 ``
 */
-
+		
                 if($a==$mod_name || substr($a,0,1).substr($a,strlen($a)-2,2)=='//s' && preg_match($a,$mod_name) ) redirect($httphost.($b=='/'?'':$b));
         }
 }
@@ -250,8 +296,10 @@ $modp=strtoupper($mod_name); $mod=$site_module.$modp.".php"; if(file_exists($mod
 		'opt'=>'a:3:{s:8:"template";s:5:"blank";s:10:"autoformat";s:2:"no";s:7:"autokaw";s:2:"no";}',
 		'view_counter'=>0
         );
+//	SCRIPTS("alert(7);page_onstart.push('hotkey_reset=function(){}; hotkey=[];');");
 	ARTICLE();
 }
+
 
 // если это папка, и в ней есть индекс
 if(is_dir($filehost.$mod_name)) {
@@ -272,8 +320,18 @@ ARTICLE();
 //===============================================================================================================================
 function SCRIPTS_mine() { global $BRO;
 
+//  /*httpsite'].$GLOBALS['mypage']."';
+// var hashpage='".$GLOBALS['hashpage']."';
+
 $o=array();
 $e=$GLOBALS['IS']['useropt']; if(gettype($e)=='array'&&sizeof($e)) foreach($e as $n=>$l) $o[]=njsn($n).':'.($l==intval($l)?intval($l):'"'.njsn($l).'"'); $o=implode(',',$o);
+
+/*  НАХУЙ ОТЛОЖИМ
+if($GLOBALS['unic']) {
+    $r=ms("SELECT `fkey` FROM ".issor('db_fkey','fkey')." WHERE `unic`='".$GLOBALS['unic']."'");
+    if(empty($r)) $fkeys=''; else { $fkeys=array(); foreach($r as $l) $fkeys[]=$l['fkey']; $fkeys=implode(',',$fkeys); }
+}
+*/
 
 SCRIPTS("main","
 var useropt={".$o."};
@@ -293,8 +351,6 @@ var www_ajax='".$GLOBALS['www_ajax']."';
 var num='".$GLOBALS['article']['num']."';
 var up='".$GLOBALS['up']."';
 var realname=\"".njsn($GLOBALS['imgicourl'])."\";
-var aharu='".$GLOBALS['aharu']."';
-
 var unic='".$GLOBALS['unic']."';
 
 var hashpage='".get_hashpage()."';
@@ -302,18 +358,40 @@ var hashpage='".get_hashpage()."';
 var ux='".$GLOBALS['ux']."';
 var uname=\"".njsn($GLOBALS['uname'])."\";
 var ux_name='".$GLOBALS['ux_name']."';
-var xdomain='http://".$GLOBALS['xdomain'].".'+MYHOST;
-var xdom=xdomain+www_ajax+'autoriz.php?x=1';
+
 var mnogouser=".($GLOBALS['mnogouser']==1?1:0).";
+var xdomain='".$GLOBALS['HTTPS']."://".$GLOBALS['xdomain'].".".(isset($GLOBALS['rootdomain'])?$GLOBALS['rootdomain']:$GLOBALS['MYHOST'])."';
+var xdom=xdomain+www_ajax+'autoriz.php?x=1';
+
 var wintempl=\"".(isset($GLOBALS['wintempl'])?$GLOBALS['wintempl']:"<div class='corners'><div class='inner'><div class='content' id='{id}_body' align=left>{s}</div><div onclick=\\\"clean('{id}')\\\" title='Close' class='can'></div></div></div></div>")."\";
 var wintempl_cls='".(isset($GLOBALS['wintempl_div'])?$GLOBALS['wintempl_div']:'popup')."';
 ".(isset($_GET['search'])?"page_onstart.push(\"window.location.hash='search_0';\");":'')
-);
+); //if(aharu && admin) alert(up);
 
+
+// ."page_onstart.push(\"if(1*unic)fpkeytest();\");function fpkeytest(){ fkey=fpkey(); if(!fkey || in_array(fkey,fkeys)!==false) return; majax('autoriz.php',{a:'fkey',fkey:fkey}); }"
+// var fkeys=[".$fkeys."];
+// var fkey=0;
+
+// var xdomain='".str_replace('http://','http://'.$GLOBALS['xdomain'].'.',$GLOBALS['httpsite'])."';
+
+//var page_onstart=[];
+// ".($GLOBALS['admin']?"setTimeout(\"inject('counter.php?num=".$GLOBALS['article']['num']."&ask=1&old=0');\",5000);":'')."
 	SCRIPT_ADD($GLOBALS['www_js']."main.js");
 	if($GLOBALS['IS']['useropt']['n']) SCRIPT_ADD($GLOBALS['www_js']."ipad.js");
+	// if($GLOBALS['mnogouser'])
 	SCRIPT_ADD($GLOBALS['www_js']."transportm.js");
 }
+
+/*
+function get_mainjs(){ // получить кешированный main.js
+        $file=$GLOBALS['filehost']."js/main.js";
+        $i=md5_file($file); $n="main-".substr($i,4,12).".js";
+        $name=$GLOBALS['filehost']."js/".$n;
+        if(!is_file($name)) copy($file,$name);
+        return $n;
+}
+*/
 
 //===============================================================================================================================
 
